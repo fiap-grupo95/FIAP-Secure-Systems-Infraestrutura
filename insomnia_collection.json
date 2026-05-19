@@ -1,0 +1,1173 @@
+{
+  "info": {
+    "_postman_id": "fiap-secure-systems-mvp",
+    "name": "FIAP Secure Systems — MVP",
+    "description": "Analisador de diagramas de arquitetura via IA.\nFluxo: login → upload → processamento IA → relatório de segurança.\n\nOrdem de uso:\n1. Execute '0. Login' → copie o token para a variável jwt_token\n2. Upload Diagrama → copie process_id\n3. Poll Status até ANALISADO → copie report_id\n4. Get Report",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Checks",
+      "description": "Verifica se todos os serviços HTTP estão no ar",
+      "item": [
+        {
+          "name": "Gateway /ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/ping",
+              "host": ["{{gateway_url}}"],
+              "path": ["ping"]
+            },
+            "description": "Verifica o api-gateway (porta 8080)"
+          },
+          "response": []
+        },
+        {
+          "name": "Orchestrator /ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{orchestrator_url}}/ping",
+              "host": ["{{orchestrator_url}}"],
+              "path": ["ping"]
+            },
+            "description": "Verifica o upload-orchestrator (porta 8081)"
+          },
+          "response": []
+        },
+        {
+          "name": "Report Service /ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{report_url}}/ping",
+              "host": ["{{report_url}}"],
+              "path": ["ping"]
+            },
+            "description": "Verifica o report-service (porta 8083)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Fluxo End-to-End (API Publica)",
+      "description": "Execute nesta ordem:\n1. Login → copie o token para jwt_token\n2. Upload Diagrama → copie process_id\n3. Poll Status até ANALISADO → copie report_id\n4. Get Report",
+      "item": [
+        {
+          "name": "0. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.token) {",
+                  "    pm.collectionVariables.set('jwt_token', json.token);",
+                  "    console.log('jwt_token atualizado — expira em ' + json.expires_in + 's');",
+                  "} else {",
+                  "    console.error('Login falhou: ' + pm.response.code + ' ' + JSON.stringify(json));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{auth_username}}\",\n  \"password\": \"{{auth_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/login",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica e retorna JWT (expira em 1h).\nO script de teste preenche jwt_token automaticamente após o login com sucesso."
+          },
+          "response": []
+        },
+        {
+          "name": "1. Upload Diagrama",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (pm.response.code === 202 && json.process_id) {",
+                  "    pm.collectionVariables.set('process_id', json.process_id);",
+                  "    console.log('process_id atualizado: ' + json.process_id);",
+                  "} else {",
+                  "    console.error('Upload falhou: ' + pm.response.code + ' ' + JSON.stringify(json));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "insomnia-upload-001",
+                "description": "ID de rastreamento propagado a todos os servicos"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "diagram",
+                  "type": "file",
+                  "src": "",
+                  "description": "Imagem do diagrama (PNG, JPEG, WebP ou PDF — max 10MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/diagrams",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "diagrams"]
+            },
+            "description": "Envia diagrama de arquitetura para analise. Requer JWT. Copie o process_id da resposta."
+          },
+          "response": []
+        },
+        {
+          "name": "2a. Poll Status — RECEBIDO",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "insomnia-status-001"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/{{process_id}}/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "{{process_id}}", "status"]
+            },
+            "description": "Execute logo apos o upload. Status esperado: RECEBIDO."
+          },
+          "response": []
+        },
+        {
+          "name": "2b. Poll Status — EM_PROCESSAMENTO",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "insomnia-status-002"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/{{process_id}}/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "{{process_id}}", "status"]
+            },
+            "description": "Execute apos alguns segundos. Status esperado: EM_PROCESSAMENTO."
+          },
+          "response": []
+        },
+        {
+          "name": "2c. Poll Status — ANALISADO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.status === 'ANALISADO' && json.report_id) {",
+                  "    pm.collectionVariables.set('report_id', json.report_id);",
+                  "    console.log('report_id atualizado: ' + json.report_id);",
+                  "} else if (pm.response.code === 200) {",
+                  "    console.warn('Status atual: ' + json.status + ' — aguarde e repita a requisição');",
+                  "} else {",
+                  "    console.error('Erro ao consultar status: ' + pm.response.code + ' ' + JSON.stringify(json));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "insomnia-status-003"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/{{process_id}}/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "{{process_id}}", "status"]
+            },
+            "description": "Execute ate obter status ANALISADO. A resposta incluira report_id — copie para a variavel."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Report",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "insomnia-report-001"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/reports/{{report_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "reports", "{{report_id}}"]
+            },
+            "description": "Busca o relatorio tecnico. Disponivel apenas quando status = ANALISADO."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Casos de Erro",
+      "description": "Testes de validacao e casos de borda",
+      "item": [
+        {
+          "name": "Login credenciais inválidas → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"senha_errada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/login",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Credenciais incorretas — deve retornar 401 com mensagem generica 'invalid credentials'"
+          },
+          "response": []
+        },
+        {
+          "name": "Login body inválido → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{gateway_url}}/auth/login",
+              "host": ["{{gateway_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Campo 'password' ausente — deve retornar 400 'invalid request body'"
+          },
+          "response": []
+        },
+        {
+          "name": "Sem JWT → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/qualquer/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "qualquer", "status"]
+            },
+            "description": "Requisicao sem Authorization header — deve retornar 401"
+          },
+          "response": []
+        },
+        {
+          "name": "Token invalido → 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer token.invalido.aqui"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/qualquer/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "qualquer", "status"]
+            },
+            "description": "JWT mal-formado — deve retornar 401"
+          },
+          "response": []
+        },
+        {
+          "name": "processId inexistente → 404",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/00000000-0000-0000-0000-000000000000/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "00000000-0000-0000-0000-000000000000", "status"]
+            },
+            "description": "UUID valido mas sem registro no banco — deve retornar 404"
+          },
+          "response": []
+        },
+        {
+          "name": "processId nao-UUID → 400",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/process/nao-e-um-uuid/status",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "process", "nao-e-um-uuid", "status"]
+            },
+            "description": "ID com formato invalido — deve retornar 400 do upstream"
+          },
+          "response": []
+        },
+        {
+          "name": "reportId inexistente → 404",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/reports/00000000-0000-0000-0000-000000000000",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "reports", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "UUID valido mas sem relatorio no MongoDB — deve retornar 404"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Debug — Endpoints Internos",
+      "description": "Chamadas diretas aos servicos internos (bypass do gateway). Util para diagnostico.",
+      "item": [
+        {
+          "name": "Orchestrator — Upload Direto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "image/png"
+              },
+              {
+                "key": "X-Filename",
+                "value": "test-diagram.png"
+              },
+              {
+                "key": "X-Request-ID",
+                "value": "debug-direct-upload-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{orchestrator_url}}/internal/diagrams",
+              "host": ["{{orchestrator_url}}"],
+              "path": ["internal", "diagrams"]
+            },
+            "description": "Envia arquivo diretamente ao upload-orchestrator (sem gateway)."
+          },
+          "response": []
+        },
+        {
+          "name": "Orchestrator — Status Direto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "debug-status-001"
+              }
+            ],
+            "url": {
+              "raw": "{{orchestrator_url}}/internal/process/{{process_id}}/status",
+              "host": ["{{orchestrator_url}}"],
+              "path": ["internal", "process", "{{process_id}}", "status"]
+            },
+            "description": "Consulta status diretamente no upload-orchestrator (sem gateway/JWT)"
+          },
+          "response": []
+        },
+        {
+          "name": "Report Service — Relatorio Direto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Request-ID",
+                "value": "debug-report-001"
+              }
+            ],
+            "url": {
+              "raw": "{{report_url}}/internal/reports/{{report_id}}",
+              "host": ["{{report_url}}"],
+              "path": ["internal", "reports", "{{report_id}}"]
+            },
+            "description": "Busca relatorio diretamente no report-service (sem gateway/JWT)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "RabbitMQ — Monitoramento",
+      "description": "Chamadas a Management API do RabbitMQ (porta 15672).",
+      "item": [
+        {
+          "name": "process.queue — Estado",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{rabbitmq_url}}/api/queues/%2F/process.queue",
+              "host": ["{{rabbitmq_url}}"],
+              "path": ["api", "queues", "%2F", "process.queue"]
+            },
+            "description": "Verifica mensagens pendentes na fila do processing-service"
+          },
+          "response": []
+        },
+        {
+          "name": "report.queue — Estado",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{rabbitmq_url}}/api/queues/%2F/report.queue",
+              "host": ["{{rabbitmq_url}}"],
+              "path": ["api", "queues", "%2F", "report.queue"]
+            },
+            "description": "Verifica mensagens pendentes na fila do report-service"
+          },
+          "response": []
+        },
+        {
+          "name": "Exchanges — Lista",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{rabbitmq_url}}/api/exchanges/%2F",
+              "host": ["{{rabbitmq_url}}"],
+              "path": ["api", "exchanges", "%2F"]
+            },
+            "description": "Lista todos os exchanges (processing.topic e report.topic sao fanout)"
+          },
+          "response": []
+        },
+        {
+          "name": "Injetar Mensagem na process.queue",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{rabbitmq_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{rabbitmq_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"properties\": {\n    \"delivery_mode\": 2,\n    \"content_type\": \"application/json\"\n  },\n  \"routing_key\": \"process.queue\",\n  \"payload\": \"{\\\"process_id\\\":\\\"{{process_id}}\\\",\\\"s3_key\\\":\\\"diagrams/{{process_id}}\\\",\\\"content_type\\\":\\\"image/png\\\"}\",\n  \"payload_encoding\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{rabbitmq_url}}/api/exchanges/%2F/amq.default/publish",
+              "host": ["{{rabbitmq_url}}"],
+              "path": ["api", "exchanges", "%2F", "amq.default", "publish"]
+            },
+            "description": "Publica mensagem de teste diretamente na process.queue via Management API."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mocks — Mockoon (Testes Isolados)",
+      "description": "Chamadas diretas aos mocks Mockoon para validar cada serviço sem suas dependências reais.\n\nPortas:\n  3001 → orchestrator-mock  (simula upload-orchestrator)\n  3002 → report-mock        (simula report-service)\n  3003 → llm-mock           (simula Anthropic API)\n\nPara testar o api-gateway em modo isolado, suba-o com:\n  UPLOAD_ORCHESTRATOR_URL=http://localhost:3001\n  REPORT_SERVICE_URL=http://localhost:3002\n\nPara testar o processing-service sem LLM real, configure:\n  ANTHROPIC_BASE_URL=http://localhost:3003",
+      "item": [
+        {
+          "name": "Health Checks dos Mocks",
+          "item": [
+            {
+              "name": "Mock Orchestrator /ping",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/ping",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["ping"]
+                },
+                "description": "Verifica se o mock do orchestrator está no ar (porta 3001). Esperado: 200 {\"status\":\"ok\"}"
+              },
+              "response": []
+            },
+            {
+              "name": "Mock Report Service /ping",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{mock_report_url}}/ping",
+                  "host": ["{{mock_report_url}}"],
+                  "path": ["ping"]
+                },
+                "description": "Verifica se o mock do report-service está no ar (porta 3002). Esperado: 200 {\"status\":\"ok\"}"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Mock Orchestrator :3001 — POST /internal/diagrams",
+          "description": "Simula o endpoint de upload do upload-orchestrator.\nSelector de cenário via header X-Force-Error.",
+          "item": [
+            {
+              "name": "202 Upload aceito (padrão)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "image/png" },
+                  { "key": "X-Filename", "value": "diagrama-teste.png" },
+                  { "key": "X-Request-ID", "value": "mock-upload-001" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/diagrams",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "diagrams"]
+                },
+                "description": "Deve retornar 202 com process_id=proc-analisado e status=RECEBIDO."
+              },
+              "response": []
+            },
+            {
+              "name": "500 Erro interno — X-Force-Error: 500",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "image/png" },
+                  { "key": "X-Filename", "value": "diagrama-teste.png" },
+                  { "key": "X-Request-ID", "value": "mock-upload-002" },
+                  { "key": "X-Force-Error", "value": "500" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/diagrams",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "diagrams"]
+                },
+                "description": "Simula falha interna do orchestrator. Deve retornar 500 — o api-gateway deve propagar 502."
+              },
+              "response": []
+            },
+            {
+              "name": "413 Payload muito grande — X-Force-Error: 413",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "image/png" },
+                  { "key": "X-Filename", "value": "diagrama-gigante.png" },
+                  { "key": "X-Request-ID", "value": "mock-upload-003" },
+                  { "key": "X-Force-Error", "value": "413" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": ""
+                },
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/diagrams",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "diagrams"]
+                },
+                "description": "Simula arquivo acima do limite. Deve retornar 413."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Mock Orchestrator :3001 — GET /internal/process/:processId/status",
+          "description": "Simula os quatro estados da máquina de estados do sistema.\nUse os process IDs reservados para acionar cada cenário.",
+          "item": [
+            {
+              "name": "200 RECEBIDO — processId=proc-recebido",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-status-recebido" }],
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/process/proc-recebido/status",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "process", "proc-recebido", "status"]
+                },
+                "description": "Estado inicial: arquivo salvo e aguardando processamento. Sem report_id."
+              },
+              "response": []
+            },
+            {
+              "name": "200 EM_PROCESSAMENTO — processId=proc-processando",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-status-processando" }],
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/process/proc-processando/status",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "process", "proc-processando", "status"]
+                },
+                "description": "IA iniciou a análise. Sem report_id ainda."
+              },
+              "response": []
+            },
+            {
+              "name": "200 ANALISADO — processId=proc-analisado (padrão)",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-status-analisado" }],
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/process/proc-analisado/status",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "process", "proc-analisado", "status"]
+                },
+                "description": "Análise concluída. Retorna report_id=rpt-00000001 — use para buscar o relatório."
+              },
+              "response": []
+            },
+            {
+              "name": "200 ERRO — processId=proc-erro",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-status-erro" }],
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/process/proc-erro/status",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "process", "proc-erro", "status"]
+                },
+                "description": "Falha técnica ou guardrail da IA. Retorna status=ERRO com mensagem de erro."
+              },
+              "response": []
+            },
+            {
+              "name": "404 Not Found — processId=proc-notfound",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-status-notfound" }],
+                "url": {
+                  "raw": "{{mock_orchestrator_url}}/internal/process/proc-notfound/status",
+                  "host": ["{{mock_orchestrator_url}}"],
+                  "path": ["internal", "process", "proc-notfound", "status"]
+                },
+                "description": "Process ID inexistente. O api-gateway deve propagar 404 ao cliente."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Mock Report Service :3002 — GET /internal/reports/:reportId",
+          "description": "Simula o endpoint de busca de relatório do report-service.",
+          "item": [
+            {
+              "name": "200 Relatório completo — reportId=rpt-00000001",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-report-001" }],
+                "url": {
+                  "raw": "{{mock_report_url}}/internal/reports/rpt-00000001",
+                  "host": ["{{mock_report_url}}"],
+                  "path": ["internal", "reports", "rpt-00000001"]
+                },
+                "description": "Retorna relatório completo com components, risks e recommendations. Este é o ID retornado pelo mock de status ANALISADO."
+              },
+              "response": []
+            },
+            {
+              "name": "404 Not Found — reportId=notfound",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "X-Request-ID", "value": "mock-report-notfound" }],
+                "url": {
+                  "raw": "{{mock_report_url}}/internal/reports/notfound",
+                  "host": ["{{mock_report_url}}"],
+                  "path": ["internal", "reports", "notfound"]
+                },
+                "description": "Relatório inexistente. O api-gateway deve propagar 404 ao cliente."
+              },
+              "response": []
+            },
+            {
+              "name": "500 Erro interno — X-Force-Error: 500",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "X-Request-ID", "value": "mock-report-error" },
+                  { "key": "X-Force-Error", "value": "500" }
+                ],
+                "url": {
+                  "raw": "{{mock_report_url}}/internal/reports/rpt-00000001",
+                  "host": ["{{mock_report_url}}"],
+                  "path": ["internal", "reports", "rpt-00000001"]
+                },
+                "description": "Falha interna do report-service. O api-gateway deve propagar 502."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Mock LLM Anthropic :3003 — POST /v1/messages",
+          "description": "Simula a Anthropic Messages API consumida pelo processing-service.\nPara usar, configure o processing-service com:\n  ANTHROPIC_BASE_URL=http://localhost:3003\n\nSelector de cenário via header X-Force-Error.",
+          "item": [
+            {
+              "name": "200 Análise válida (padrão)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-api-key", "value": "mock-api-key" },
+                  { "key": "anthropic-version", "value": "2023-06-01" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"Analyze this architecture diagram.\"\n        }\n      ]\n    }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{mock_llm_url}}/v1/messages",
+                  "host": ["{{mock_llm_url}}"],
+                  "path": ["v1", "messages"]
+                },
+                "description": "Retorna análise JSON válida com components, risks e recommendations (latência simulada de 200ms). O processing-service deve fazer parse, persistir no DynamoDB e publicar na report.queue."
+              },
+              "response": []
+            },
+            {
+              "name": "200 JSON inválido — dispara ErrLLMGuardrail (X-Force-Error: guardrail)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-api-key", "value": "mock-api-key" },
+                  { "key": "anthropic-version", "value": "2023-06-01" },
+                  { "key": "X-Force-Error", "value": "guardrail" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        { \"type\": \"text\", \"text\": \"Analyze this diagram.\" }\n      ]\n    }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{mock_llm_url}}/v1/messages",
+                  "host": ["{{mock_llm_url}}"],
+                  "path": ["v1", "messages"]
+                },
+                "description": "O LLM retorna texto livre (não JSON). O processing-service deve detectar via parseAndValidate e gravar status=ERRO no DynamoDB."
+              },
+              "response": []
+            },
+            {
+              "name": "429 Rate Limit (X-Force-Error: rate-limit)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-api-key", "value": "mock-api-key" },
+                  { "key": "anthropic-version", "value": "2023-06-01" },
+                  { "key": "X-Force-Error", "value": "rate-limit" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [{ \"type\": \"text\", \"text\": \"Analyze this diagram.\" }]\n    }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{mock_llm_url}}/v1/messages",
+                  "host": ["{{mock_llm_url}}"],
+                  "path": ["v1", "messages"]
+                },
+                "description": "Simula limite de requisições da API Anthropic. Resposta inclui header Retry-After: 60. O processing-service deve gravar ERRO no DynamoDB."
+              },
+              "response": []
+            },
+            {
+              "name": "500 Server Error (X-Force-Error: server-error)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-api-key", "value": "mock-api-key" },
+                  { "key": "anthropic-version", "value": "2023-06-01" },
+                  { "key": "X-Force-Error", "value": "server-error" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 4096,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [{ \"type\": \"text\", \"text\": \"Analyze this diagram.\" }]\n    }\n  ]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{mock_llm_url}}/v1/messages",
+                  "host": ["{{mock_llm_url}}"],
+                  "path": ["v1", "messages"]
+                },
+                "description": "Simula falha interna da Anthropic API. O processing-service deve gravar ERRO no DynamoDB e publicar evento de falha no processing.topic."
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DynamoDB Local — Diagnostico",
+      "description": "Chamadas diretas ao DynamoDB Local (porta 8000).",
+      "item": [
+        {
+          "name": "Scan processing_jobs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.0"
+              },
+              {
+                "key": "X-Amz-Target",
+                "value": "DynamoDB_20120810.Scan"
+              },
+              {
+                "key": "Authorization",
+                "value": "AWS4-HMAC-SHA256 Credential=fakekey/20260516/us-east-1/dynamodb/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-target, Signature=fakesig"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"TableName\": \"processing_jobs\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000"
+            },
+            "description": "Lista todos os jobs de processamento armazenados no DynamoDB Local"
+          },
+          "response": []
+        },
+        {
+          "name": "List Tables",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.0"
+              },
+              {
+                "key": "X-Amz-Target",
+                "value": "DynamoDB_20120810.ListTables"
+              },
+              {
+                "key": "Authorization",
+                "value": "AWS4-HMAC-SHA256 Credential=fakekey/20260516/us-east-1/dynamodb/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-target, Signature=fakesig"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://localhost:8000",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8000"
+            },
+            "description": "Lista todas as tabelas existentes no DynamoDB Local"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "orchestrator_url",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "report_url",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "rabbitmq_url",
+      "value": "http://localhost:15672",
+      "type": "string"
+    },
+    {
+      "key": "rabbitmq_user",
+      "value": "guest",
+      "type": "string"
+    },
+    {
+      "key": "rabbitmq_pass",
+      "value": "dev_rabbitmq_pass",
+      "type": "string"
+    },
+    {
+      "key": "auth_username",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "auth_password",
+      "value": "SUA_SENHA_AQUI",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "OBTENHA_COM: POST /auth/login → copie o campo token",
+      "type": "string"
+    },
+    {
+      "key": "process_id",
+      "value": "PREENCHA_APOS_UPLOAD",
+      "type": "string"
+    },
+    {
+      "key": "report_id",
+      "value": "PREENCHA_QUANDO_STATUS_ANALISADO",
+      "type": "string"
+    },
+    {
+      "key": "mock_orchestrator_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "mock_report_url",
+      "value": "http://localhost:3002",
+      "type": "string"
+    },
+    {
+      "key": "mock_llm_url",
+      "value": "http://localhost:3003",
+      "type": "string"
+    }
+  ]
+}

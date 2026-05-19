@@ -1,0 +1,154 @@
+{
+  "uuid": "30000001-0001-0001-0001-000000000001",
+  "lastMigration": 33,
+  "name": "Anthropic LLM API Mock",
+  "endpointPrefix": "",
+  "latency": 0,
+  "port": 3003,
+  "hostname": "",
+  "folders": [],
+  "routes": [
+    {
+      "uuid": "30000001-0001-0001-0001-000000000010",
+      "type": "http",
+      "documentation": "Anthropic Messages API — POST /v1/messages\n\nUsado pelo processing-service para análise de diagramas via visão computacional.\nConfigurar o processing-service com: ANTHROPIC_BASE_URL=http://mockoon:3003\n\nCenários (via header X-Force-Error):\n  - sem header         → 200 análise completa válida (padrão)\n  - X-Force-Error: guardrail → 200 com JSON inválido (dispara ErrLLMGuardrail)\n  - X-Force-Error: rate-limit → 429 Too Many Requests\n  - X-Force-Error: server-error → 500 Internal Server Error",
+      "method": "post",
+      "endpoint": "v1/messages",
+      "responses": [
+        {
+          "uuid": "30000001-0001-0001-0001-000000000011",
+          "body": "{\"id\":\"msg_mock_00000001\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"components\\\":[\\\"API Gateway (Gin)\\\",\\\"Upload Orchestrator\\\",\\\"Processing Service\\\",\\\"Report Service\\\",\\\"MinIO Object Storage\\\",\\\"PostgreSQL\\\",\\\"DynamoDB Local\\\",\\\"MongoDB\\\",\\\"RabbitMQ\\\"],\\\"risks\\\":[\\\"Ausência de mTLS entre microsserviços internos\\\",\\\"Credenciais MinIO sem TLS na rede interna\\\",\\\"Falta de circuit breaker no consumer RabbitMQ\\\",\\\"DynamoDB Local sem autenticação real\\\",\\\"Sem rate limiting nos endpoints /internal/*\\\"],\\\"recommendations\\\":[\\\"Implementar mTLS com mutual TLS entre serviços\\\",\\\"Habilitar TLS no MinIO com certificados assinados\\\",\\\"Adicionar circuit breaker com exponential backoff\\\",\\\"Substituir DynamoDB Local por AWS DynamoDB em produção\\\",\\\"Aplicar autenticação nos endpoints internos\\\"]}\"}],\"model\":\"claude-sonnet-4-6\",\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":1024,\"output_tokens\":256}}",
+          "latency": 200,
+          "statusCode": 200,
+          "label": "200 Análise válida (padrão)",
+          "headers": [
+            { "key": "Content-Type", "value": "application/json" },
+            { "key": "X-Request-Id", "value": "mock-req-00000001" }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "30000001-0001-0001-0001-000000000012",
+          "body": "{\"id\":\"msg_mock_guardrail\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Desculpe, não consigo analisar esta imagem no momento.\"}],\"model\":\"claude-sonnet-4-6\",\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":512,\"output_tokens\":20}}",
+          "latency": 100,
+          "statusCode": 200,
+          "label": "200 Resposta inválida (dispara ErrLLMGuardrail) — X-Force-Error: guardrail",
+          "headers": [
+            { "key": "Content-Type", "value": "application/json" },
+            { "key": "X-Request-Id", "value": "mock-req-guardrail" }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "header",
+              "modifier": "X-Force-Error",
+              "invert": false,
+              "operator": "equals",
+              "value": "guardrail"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "30000001-0001-0001-0001-000000000013",
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Rate limit exceeded. Please retry after 60 seconds.\"}}",
+          "latency": 0,
+          "statusCode": 429,
+          "label": "429 Rate Limit — X-Force-Error: rate-limit",
+          "headers": [
+            { "key": "Content-Type", "value": "application/json" },
+            { "key": "Retry-After", "value": "60" }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "header",
+              "modifier": "X-Force-Error",
+              "invert": false,
+              "operator": "equals",
+              "value": "rate-limit"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "30000001-0001-0001-0001-000000000014",
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"Internal server error\"}}",
+          "latency": 0,
+          "statusCode": 500,
+          "label": "500 Server Error — X-Force-Error: server-error",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "header",
+              "modifier": "X-Force-Error",
+              "invert": false,
+              "operator": "equals",
+              "value": "server-error"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    }
+  ],
+  "rootChildren": [
+    { "type": "route", "uuid": "30000001-0001-0001-0001-000000000010" }
+  ],
+  "proxyMode": false,
+  "proxyHost": "",
+  "proxyRemovePrefix": false,
+  "tlsOptions": {
+    "enabled": false,
+    "type": "CERT",
+    "pfxPath": "",
+    "certPath": "",
+    "keyPath": "",
+    "caPath": "",
+    "passphrase": ""
+  },
+  "cors": true,
+  "headers": [{ "key": "Content-Type", "value": "application/json" }],
+  "proxyReqHeaders": [{ "key": "", "value": "" }],
+  "proxyResHeaders": [{ "key": "", "value": "" }],
+  "data": [],
+  "callbacks": []
+}

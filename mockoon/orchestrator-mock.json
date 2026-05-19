@@ -1,0 +1,290 @@
+{
+  "uuid": "10000001-0001-0001-0001-000000000001",
+  "lastMigration": 33,
+  "name": "Upload Orchestrator Mock",
+  "endpointPrefix": "",
+  "latency": 0,
+  "port": 3001,
+  "hostname": "",
+  "folders": [],
+  "routes": [
+    {
+      "uuid": "10000001-0001-0001-0001-000000000010",
+      "type": "http",
+      "documentation": "Healthcheck — GET /ping",
+      "method": "get",
+      "endpoint": "ping",
+      "responses": [
+        {
+          "uuid": "10000001-0001-0001-0001-000000000011",
+          "body": "{\"status\":\"ok\",\"service\":\"upload-orchestrator\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 OK",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "10000001-0001-0001-0001-000000000020",
+      "type": "http",
+      "documentation": "Upload de diagrama — POST /internal/diagrams\n\nCenários de teste (via header X-Force-Error):\n  - sem header → 202 Accepted\n  - X-Force-Error: 500 → 500 Internal Server Error\n  - X-Force-Error: 413 → 413 Payload Too Large",
+      "method": "post",
+      "endpoint": "internal/diagrams",
+      "responses": [
+        {
+          "uuid": "10000001-0001-0001-0001-000000000021",
+          "body": "{\"process_id\":\"proc-analisado\",\"status\":\"RECEBIDO\",\"created_at\":\"2024-01-15T10:00:00Z\"}",
+          "latency": 0,
+          "statusCode": 202,
+          "label": "202 Upload aceito (padrão)",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "10000001-0001-0001-0001-000000000022",
+          "body": "{\"error\":\"internal server error\"}",
+          "latency": 0,
+          "statusCode": 500,
+          "label": "500 Erro interno — X-Force-Error: 500",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "header",
+              "modifier": "X-Force-Error",
+              "invert": false,
+              "operator": "equals",
+              "value": "500"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "10000001-0001-0001-0001-000000000023",
+          "body": "{\"error\":\"request entity too large\"}",
+          "latency": 0,
+          "statusCode": 413,
+          "label": "413 Payload muito grande — X-Force-Error: 413",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "header",
+              "modifier": "X-Force-Error",
+              "invert": false,
+              "operator": "equals",
+              "value": "413"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "10000001-0001-0001-0001-000000000030",
+      "type": "http",
+      "documentation": "Consulta de status — GET /internal/process/:processId/status\n\nProcess IDs reservados:\n  - proc-recebido    → 200 RECEBIDO\n  - proc-processando → 200 EM_PROCESSAMENTO\n  - proc-analisado   → 200 ANALISADO + report_id (padrão)\n  - proc-erro        → 200 ERRO + mensagem\n  - proc-notfound    → 404 Not Found",
+      "method": "get",
+      "endpoint": "internal/process/:processId/status",
+      "responses": [
+        {
+          "uuid": "10000001-0001-0001-0001-000000000031",
+          "body": "{\"process_id\":\"proc-analisado\",\"status\":\"ANALISADO\",\"report_id\":\"rpt-00000001\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 ANALISADO (padrão / qualquer ID)",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "10000001-0001-0001-0001-000000000032",
+          "body": "{\"process_id\":\"proc-recebido\",\"status\":\"RECEBIDO\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 RECEBIDO — processId=proc-recebido",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "params",
+              "modifier": "processId",
+              "invert": false,
+              "operator": "equals",
+              "value": "proc-recebido"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "10000001-0001-0001-0001-000000000033",
+          "body": "{\"process_id\":\"proc-processando\",\"status\":\"EM_PROCESSAMENTO\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 EM_PROCESSAMENTO — processId=proc-processando",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "params",
+              "modifier": "processId",
+              "invert": false,
+              "operator": "equals",
+              "value": "proc-processando"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "10000001-0001-0001-0001-000000000034",
+          "body": "{\"process_id\":\"proc-erro\",\"status\":\"ERRO\",\"error\":\"LLM analysis failed: model returned invalid JSON\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 ERRO — processId=proc-erro",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "params",
+              "modifier": "processId",
+              "invert": false,
+              "operator": "equals",
+              "value": "proc-erro"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "10000001-0001-0001-0001-000000000035",
+          "body": "{\"error\":\"process not found\"}",
+          "latency": 0,
+          "statusCode": 404,
+          "label": "404 Not Found — processId=proc-notfound",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "params",
+              "modifier": "processId",
+              "invert": false,
+              "operator": "equals",
+              "value": "proc-notfound"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    }
+  ],
+  "rootChildren": [
+    { "type": "route", "uuid": "10000001-0001-0001-0001-000000000010" },
+    { "type": "route", "uuid": "10000001-0001-0001-0001-000000000020" },
+    { "type": "route", "uuid": "10000001-0001-0001-0001-000000000030" }
+  ],
+  "proxyMode": false,
+  "proxyHost": "",
+  "proxyRemovePrefix": false,
+  "tlsOptions": {
+    "enabled": false,
+    "type": "CERT",
+    "pfxPath": "",
+    "certPath": "",
+    "keyPath": "",
+    "caPath": "",
+    "passphrase": ""
+  },
+  "cors": true,
+  "headers": [{ "key": "Content-Type", "value": "application/json" }],
+  "proxyReqHeaders": [{ "key": "", "value": "" }],
+  "proxyResHeaders": [{ "key": "", "value": "" }],
+  "data": [],
+  "callbacks": []
+}

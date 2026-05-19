@@ -1,0 +1,150 @@
+{
+  "uuid": "20000001-0001-0001-0001-000000000001",
+  "lastMigration": 33,
+  "name": "Report Service Mock",
+  "endpointPrefix": "",
+  "latency": 0,
+  "port": 3002,
+  "hostname": "",
+  "folders": [],
+  "routes": [
+    {
+      "uuid": "20000001-0001-0001-0001-000000000010",
+      "type": "http",
+      "documentation": "Healthcheck — GET /ping",
+      "method": "get",
+      "endpoint": "ping",
+      "responses": [
+        {
+          "uuid": "20000001-0001-0001-0001-000000000011",
+          "body": "{\"status\":\"ok\",\"service\":\"report-service\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 OK",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "20000001-0001-0001-0001-000000000020",
+      "type": "http",
+      "documentation": "Busca relatório — GET /internal/reports/:reportId\n\nReport IDs reservados:\n  - rpt-00000001  → 200 relatório completo (padrão)\n  - notfound      → 404 Not Found\n  - Header X-Force-Error: 500 → 500 Internal Server Error",
+      "method": "get",
+      "endpoint": "internal/reports/:reportId",
+      "responses": [
+        {
+          "uuid": "20000001-0001-0001-0001-000000000021",
+          "body": "{\"report_id\":\"rpt-00000001\",\"process_id\":\"proc-analisado\",\"components\":[\"API Gateway (Gin)\",\"Upload Orchestrator\",\"Processing Service\",\"Report Service\",\"MinIO Object Storage\",\"PostgreSQL\",\"DynamoDB Local\",\"MongoDB\",\"RabbitMQ (AMQP)\"],\"risks\":[\"Ausência de mTLS entre microsserviços internos\",\"Credenciais MinIO transmitidas sem TLS na rede interna\",\"Falta de circuit breaker no consumidor RabbitMQ\",\"DynamoDB Local sem autenticação real em ambiente de produção\",\"Sem rate limiting nos endpoints internos /internal/*\"],\"recommendations\":[\"Implementar mTLS com mutual certificate authentication entre serviços\",\"Habilitar TLS no MinIO e usar certificados assinados\",\"Adicionar circuit breaker com exponential backoff nos consumers\",\"Substituir DynamoDB Local por AWS DynamoDB real em produção\",\"Aplicar rate limiting e autenticação nos endpoints internos\"],\"created_at\":\"2024-01-15T10:05:00Z\"}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "200 Relatório completo (padrão)",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "20000001-0001-0001-0001-000000000022",
+          "body": "{\"error\":\"report not found\"}",
+          "latency": 0,
+          "statusCode": 404,
+          "label": "404 Not Found — reportId=notfound",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "params",
+              "modifier": "reportId",
+              "invert": false,
+              "operator": "equals",
+              "value": "notfound"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "20000001-0001-0001-0001-000000000023",
+          "body": "{\"error\":\"internal server error\"}",
+          "latency": 0,
+          "statusCode": 500,
+          "label": "500 Erro interno — X-Force-Error: 500",
+          "headers": [{ "key": "Content-Type", "value": "application/json" }],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [
+            {
+              "target": "header",
+              "modifier": "X-Force-Error",
+              "invert": false,
+              "operator": "equals",
+              "value": "500"
+            }
+          ],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    }
+  ],
+  "rootChildren": [
+    { "type": "route", "uuid": "20000001-0001-0001-0001-000000000010" },
+    { "type": "route", "uuid": "20000001-0001-0001-0001-000000000020" }
+  ],
+  "proxyMode": false,
+  "proxyHost": "",
+  "proxyRemovePrefix": false,
+  "tlsOptions": {
+    "enabled": false,
+    "type": "CERT",
+    "pfxPath": "",
+    "certPath": "",
+    "keyPath": "",
+    "caPath": "",
+    "passphrase": ""
+  },
+  "cors": true,
+  "headers": [{ "key": "Content-Type", "value": "application/json" }],
+  "proxyReqHeaders": [{ "key": "", "value": "" }],
+  "proxyResHeaders": [{ "key": "", "value": "" }],
+  "data": [],
+  "callbacks": []
+}

@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        language: system
+        entry: bash -c 'for d in api-gateway upload-orchestrator processing-service report-service; do gofmt -l -w ./$d/; done'
+        pass_filenames: false
+        types: [go]

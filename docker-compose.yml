@@ -1,0 +1,217 @@
+services:
+  # ─── Infraestrutura ───────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-orchestrator}
+      POSTGRES_USER: ${POSTGRES_USER:-orchestrator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./upload-orchestrator/infra/scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-report}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?MONGO_PASSWORD is required}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-reports}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -w '%{http_code}' http://localhost:8000/ | grep -qE '^(200|400)$'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ─── Mocks (Mockoon) ──────────────────────────────────────────────────────
+  # Três ambientes em um único container:
+  #   3001 → orchestrator-mock  (substitui upload-orchestrator para testar api-gateway isolado)
+  #   3002 → report-mock        (substitui report-service para testar api-gateway isolado)
+  #   3003 → llm-mock           (substitui Anthropic API para testar processing-service isolado)
+  #
+  # Para usar o LLM mock no processing-service, defina no .env:
+  #   ANTHROPIC_BASE_URL=http://mockoon:3003
+  mockoon:
+    image: mockoon/cli:latest
+    volumes:
+      - ./mockoon:/data:ro
+    command:
+      - --data
+      - /data/orchestrator-mock.json
+      - --data
+      - /data/report-mock.json
+      - --data
+      - /data/llm-mock.json
+    ports:
+      - "3001:3001"
+      - "3002:3002"
+      - "3003:3003"
+    restart: unless-stopped
+
+  # ─── Microsserviços ───────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      UPLOAD_ORCHESTRATOR_URL: http://upload-orchestrator:8081
+      REPORT_SERVICE_URL: http://report-service:8083
+      MAX_UPLOAD_SIZE_MB: "10"
+      ALLOWED_MIME_TYPES: "image/png,image/jpeg,image/webp,application/pdf"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      AUTH_USERNAME: ${AUTH_USERNAME:?AUTH_USERNAME is required}
+      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?AUTH_PASSWORD_HASH is required}
+    depends_on:
+      upload-orchestrator:
+        condition: service_healthy
+    restart: unless-stopped
+
+  upload-orchestrator:
+    build:
+      context: ./upload-orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: "8081"
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-orchestrator}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-orchestrator}?sslmode=disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-diagrams}
+      MINIO_USE_SSL: "false"
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      PROCESS_QUEUE: process.queue
+      PROCESSING_TOPIC: processing.topic
+      REPORT_TOPIC: report.topic
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  processing-service:
+    build:
+      context: ./processing-service
+      dockerfile: Dockerfile
+    environment:
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      DYNAMODB_REGION: us-east-1
+      DYNAMODB_TABLE: processing_jobs
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-fakekey}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-fakesecret}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-diagrams}
+      MINIO_USE_SSL: "false"
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      PROCESS_QUEUE: process.queue
+      REPORT_QUEUE: report.queue
+      PROCESSING_TOPIC: processing.topic
+      LLM_API_KEY: ${LLM_API_KEY:?LLM_API_KEY is required}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+      LLM_MAX_TOKENS: "4096"
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  report-service:
+    build:
+      context: ./report-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      PORT: "8083"
+      MONGO_URI: mongodb://${MONGO_USER:-report}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DB:-reports}?authSource=admin
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      REPORT_QUEUE: report.queue
+      REPORT_TOPIC: report.topic
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mongo_data:
+  minio_data:
+  rabbitmq_data:

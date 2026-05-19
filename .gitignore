@@ -1,0 +1,59 @@
+# Binários Go
+bin/
+*/bin/
+api-gateway/api-gateway
+upload-orchestrator/upload-orchestrator
+processing-service/processing-service
+report-service/report-service
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Cache e build
+*.test
+*.out
+vendor/
+dist/
+
+# Dependências Go
+go.sum
+
+# Ambiente
+.env
+.env.*
+!.env.example
+*.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.DS_Store
+
+# Docker
+.docker/
+
+# Logs
+*.log
+logs/
+
+# Cobertura de testes
+coverage.out
+coverage.html
+
+# Temporários
+tmp/
+temp/
+
+# Tooling interno (Claude Code / agentes)
+.claude/
+.agents/
+
+# Microsserviços — cada um tem seu próprio repositório git
+api-gateway/
+upload-orchestrator/
+processing-service/
+report-service/
