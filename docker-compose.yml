@@ -175,9 +175,10 @@ services:
       PROCESS_QUEUE: process.queue
       REPORT_QUEUE: report.queue
       PROCESSING_TOPIC: processing.topic
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       LLM_API_KEY: ${LLM_API_KEY:?LLM_API_KEY is required}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
-      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-4-6}
+      LLM_MODEL: ${LLM_MODEL:?LLM_MODEL is required}
       LLM_MAX_TOKENS: "4096"
     depends_on:
       dynamodb-local:
