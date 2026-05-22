@@ -1,0 +1,26 @@
+infra/newrelic/logging.d/docker-logs.yml
+  s_017d8af4510f35::t_eea0d93c42bcb5 1-20
+docker-compose.yml
+  s_017d8af4510f35::t_d3f3a24e12b8c8 106-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.12",
+  "base_commit_sha": "dc9c97d44935615736eddb18b85ac51ae72ac9cb",
+  "prompts": {},
+  "humans": {
+    "h_08c840ee615c43": {
+      "author": "programanda03 <paganiamanda791@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_017d8af4510f35": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d66c0fd1-4d70-4b5e-a7af-72838c054fc3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "programanda03 <paganiamanda791@gmail.com>"
+    }
+  }
+}
