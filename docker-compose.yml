@@ -119,6 +119,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       AUTH_USERNAME: ${AUTH_USERNAME:?AUTH_USERNAME is required}
       AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?AUTH_PASSWORD_HASH is required}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: fiap-secure-systems-api-gateway
     depends_on:
       upload-orchestrator:
         condition: service_healthy
@@ -142,6 +144,8 @@ services:
       PROCESS_QUEUE: process.queue
       PROCESSING_TOPIC: processing.topic
       REPORT_TOPIC: report.topic
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: fiap-secure-systems-upload-orchestrator
     depends_on:
       postgres:
         condition: service_healthy
@@ -180,6 +184,8 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:?LLM_MODEL is required}
       LLM_MAX_TOKENS: "4096"
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: fiap-secure-systems-processing-service
     depends_on:
       dynamodb-local:
         condition: service_healthy
@@ -199,6 +205,8 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
       REPORT_QUEUE: report.queue
       REPORT_TOPIC: report.topic
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: fiap-secure-systems-report-service
     depends_on:
       mongodb:
         condition: service_healthy
