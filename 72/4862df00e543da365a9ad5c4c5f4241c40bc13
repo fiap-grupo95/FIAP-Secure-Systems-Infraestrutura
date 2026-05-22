@@ -1,0 +1,27 @@
+docker-compose.yml
+  s_017d8af4510f35::t_2dc42db476ad64 147-148
+  s_017d8af4510f35::t_2692af99c0ecc8 187-188
+  s_017d8af4510f35::t_6f84d76b360254 208-209
+  s_017d8af4510f35::t_e73bff981b5c82 122-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.12",
+  "base_commit_sha": "724862df00e543da365a9ad5c4c5f4241c40bc13",
+  "prompts": {},
+  "humans": {
+    "h_08c840ee615c43": {
+      "author": "programanda03 <paganiamanda791@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_017d8af4510f35": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d66c0fd1-4d70-4b5e-a7af-72838c054fc3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "programanda03 <paganiamanda791@gmail.com>"
+    }
+  }
+}
