@@ -1,0 +1,20 @@
+logs:
+  - name: api-gateway
+    docker:
+      containers:
+        - hacka-api-gateway-1
+
+  - name: upload-orchestrator
+    docker:
+      containers:
+        - hacka-upload-orchestrator-1
+
+  - name: processing-service
+    docker:
+      containers:
+        - hacka-processing-service-1
+
+  - name: report-service
+    docker:
+      containers:
+        - hacka-report-service-1
