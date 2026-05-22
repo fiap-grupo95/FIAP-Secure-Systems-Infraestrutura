@@ -134,9 +134,11 @@ curl http://localhost:8083/ping   # report-service
 ### Gerar token JWT para testes
 
 ```bash
-source .env
-go run api-gateway/docs/generate_token.go
-# Copie o token gerado para usar nos requests autenticados
+# A partir da raiz do projeto
+cp .env.example .env   # edite JWT_SECRET, AUTH_USERNAME, AUTH_PASSWORD_HASH e LLM_API_KEY
+
+# Gerar hash bcrypt para AUTH_PASSWORD_HASH (já escapado para o Docker Compose):
+htpasswd -bnBC 10 "" SUA_SENHA | tr -d ':\n' | sed 's/\$/\$\$/g'
 ```
 
 ### Testar o fluxo completo
